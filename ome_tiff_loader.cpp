@@ -22,8 +22,8 @@ OmeTiffLoader::OmeTiffLoader(const std::string &fNameWithPath){
 
 OmeTiffLoader::~OmeTiffLoader(){gsTiffTileLoader = nullptr;};
 
-size_t OmeTiffLoader::getRowTileCount() const {return gsTiffTileLoader->numberTileWidth();}
-size_t OmeTiffLoader::getColumnTileCount() const {return gsTiffTileLoader->numberTileHeight();}
+size_t OmeTiffLoader::getRowTileCount() const {return gsTiffTileLoader->numberTileHeight();}
+size_t OmeTiffLoader::getColumnTileCount() const {return gsTiffTileLoader->numberTileWidth();}
 size_t OmeTiffLoader::getImageHeight() const {return gsTiffTileLoader->fullHeight(0);}
 size_t OmeTiffLoader::getImageWidth() const {return gsTiffTileLoader->fullWidth(0);}
 size_t OmeTiffLoader::getTileHeight() const {return gsTiffTileLoader->tileHeight(0);}

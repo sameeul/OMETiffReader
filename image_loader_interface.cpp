@@ -18,6 +18,12 @@ inline py::array_t<typename Sequence::value_type> as_pyarray_shared(std::shared_
 PYBIND11_MODULE(image_loader_lib, m) {
   py::class_<OmeTiffLoader, std::shared_ptr<OmeTiffLoader>>(m, "OmeTiffLoader")
     .def(py::init<const std::string &>())
+    .def("get_image_height", &OmeTiffLoader::getImageHeight)
+    .def("get_image_width", &OmeTiffLoader::getImageWidth)
+    .def("get_tile_height", &OmeTiffLoader::getTileHeight)
+    .def("get_tile_width", &OmeTiffLoader::getTileWidth)
+    .def("get_row_tile_count", &OmeTiffLoader::getRowTileCount)
+    .def("get_column_tile_count", &OmeTiffLoader::getColumnTileCount)
     .def("get_tile_data",
         [](OmeTiffLoader& tl, size_t const indexRowGlobalTile, size_t const indexColGlobalTile) -> py::array_t<uint32_t> {
             auto tmp = tl.getTileData(indexRowGlobalTile, indexColGlobalTile);
