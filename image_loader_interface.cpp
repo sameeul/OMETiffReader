@@ -25,8 +25,23 @@ PYBIND11_MODULE(image_loader_lib, m) {
     .def("get_row_tile_count", &OmeTiffLoader::getRowTileCount)
     .def("get_column_tile_count", &OmeTiffLoader::getColumnTileCount)
     .def("get_tile_data",
+        [](OmeTiffLoader& tl, size_t const indexGlobalTile) -> py::array_t<uint32_t> {
+            auto tmp = tl.getTileData(indexGlobalTile);
+            return as_pyarray_shared(tmp) ;
+        }, py::return_value_policy::reference)
+    .def("get_tile_data",
         [](OmeTiffLoader& tl, size_t const indexRowGlobalTile, size_t const indexColGlobalTile) -> py::array_t<uint32_t> {
             auto tmp = tl.getTileData(indexRowGlobalTile, indexColGlobalTile);
+            return as_pyarray_shared(tmp) ;
+        }, py::return_value_policy::reference)
+     .def("get_tile_data_containing_pixel",
+        [](OmeTiffLoader& tl, size_t const indexRowPixel, size_t const indexColPixel) -> py::array_t<uint32_t> {
+            auto tmp = tl.getTileDataContainingPixel(indexRowPixel, indexColPixel);
+            return as_pyarray_shared(tmp) ;
+        }, py::return_value_policy::reference)    
+    .def("get_virtual_tile_data_bounding_box",
+        [](OmeTiffLoader& tl, size_t const indexRowMinPixel, size_t const indexRowMaxPixel, size_t const indexColMinPixel, size_t const indexColMaxPixel) -> py::array_t<uint32_t> {
+            auto tmp = tl.getBoundingBoxVirtualTileData(indexRowMinPixel, indexRowMaxPixel, indexColMinPixel, indexColMaxPixel);
             return as_pyarray_shared(tmp) ;
         }, py::return_value_policy::reference);
 }

@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.18)
 project(image_loader_lib LANGUAGES CXX)
-
+set(CMAKE_DEBUG_POSTFIX d)
 set (CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(imageloader main.cpp ome_tiff_loader.cpp)
+#add_executable(imageloader main_fastloader_example.cpp)
 
 # PyBind
 find_package(Python COMPONENTS Interpreter Development)
