@@ -3,6 +3,7 @@
 #include <vector>
 #include <iostream>
 #include "ome_tiff_loader.h"
+#include <sys/resource.h>
 
 size_t partial_sum(std::shared_ptr<std::vector<uint32_t>> data, size_t x_min, size_t x_max, size_t y_min, size_t y_max)
 {
@@ -18,9 +19,11 @@ size_t partial_sum(std::shared_ptr<std::vector<uint32_t>> data, size_t x_min, si
     return sum;
 }
 
+
+
 void test1()
 {
-    std::cout<<"Test 2 - Virtual Tile From 4 Tiles" <<std::endl;
+    std::cout<<"Test 1 - Virtual Tile From 4 Tiles" <<std::endl;
     OmeTiffLoader imgLoader = OmeTiffLoader("r01_x10_y05_z08.ome.tif");
     auto numRowTiles = imgLoader.getRowTileCount();
     auto numColTiles = imgLoader.getColumnTileCount();  
@@ -109,9 +112,28 @@ void test3()
 
 }
 
+
+void test4()
+{
+    std::cout<<"Test 3 - Single Tile Memory usage" <<std::endl;
+    OmeTiffLoader imgLoader = OmeTiffLoader("r01_x10_y05_z08.ome.tif");
+    struct rusage rss1, rss2;
+    auto start = std::chrono::steady_clock::now(); 
+    auto tmp = getrusage(RUSAGE_SELF, &rss1);
+    std::shared_ptr<std::vector<uint32_t>> tileData = imgLoader.getTileData(0,0);
+    tmp = getrusage(RUSAGE_SELF, &rss2);
+
+    std::cout<<"Memory usage for tile " << rss2.ru_maxrss - rss1.ru_maxrss << std::endl;
+    auto end = std::chrono::steady_clock::now(); 
+    std::chrono::duration<double> elapsed_seconds = end-start;
+    std::cout<<"elapsed_time " << elapsed_seconds.count() << std::endl;
+
+}
+
 int main(){
-    test1();
-    test2();
-    test3();
+    // test1();
+    // test2();
+    // test3();
+    test4();
     return 0;
 }

@@ -15,6 +15,15 @@ inline py::array_t<typename Sequence::value_type> as_pyarray_shared(std::shared_
  
 }
 
+template <typename Sequence>
+inline py::array_t<typename Sequence::value_type> as_pyarray_shared_2d(std::shared_ptr<Sequence> seq_ptr, size_t num_rows, size_t num_cols) {
+    auto size = seq_ptr->size();
+    auto data = seq_ptr->data();
+    auto capsule = py::capsule(new auto (seq_ptr), [](void *p) {delete reinterpret_cast<decltype(seq_ptr)*>(p);});
+    return py::array(size, data, capsule).reshape({num_rows, num_cols});
+ 
+}
+
 PYBIND11_MODULE(image_loader_lib, m) {
   py::class_<OmeTiffLoader, std::shared_ptr<OmeTiffLoader>>(m, "OmeTiffLoader")
     .def(py::init<const std::string &>())
@@ -43,5 +52,12 @@ PYBIND11_MODULE(image_loader_lib, m) {
         [](OmeTiffLoader& tl, size_t const indexRowMinPixel, size_t const indexRowMaxPixel, size_t const indexColMinPixel, size_t const indexColMaxPixel) -> py::array_t<uint32_t> {
             auto tmp = tl.getBoundingBoxVirtualTileData(indexRowMinPixel, indexRowMaxPixel, indexColMinPixel, indexColMaxPixel);
             return as_pyarray_shared(tmp) ;
+        }, py::return_value_policy::reference)
+        .def("get_virtual_tile_data_bounding_box_2d",
+        [](OmeTiffLoader& tl, size_t const indexRowMinPixel, size_t const indexRowMaxPixel, size_t const indexColMinPixel, size_t const indexColMaxPixel) -> py::array_t<uint32_t> {
+            auto tmp = tl.getBoundingBoxVirtualTileData(indexRowMinPixel, indexRowMaxPixel, indexColMinPixel, indexColMaxPixel);
+            size_t num_rows = indexRowMaxPixel - indexRowMinPixel + 1;
+            size_t num_cols = indexColMaxPixel - indexColMinPixel + 1;
+            return as_pyarray_shared_2d(tmp, num_rows, num_cols) ;
         }, py::return_value_policy::reference);
 }

@@ -2,12 +2,8 @@
 #include <tuple>
 #include <memory>
 #include <vector>
-
 #include <fast_loader/specialised_tile_loader/grayscale_tiff_strip_loader.h>
 #include <fast_loader/specialised_tile_loader/grayscale_tiff_tile_loader.h>
-
-//#include "image_loader.h"
-
 class OmeTiffLoader{
 
     private:
