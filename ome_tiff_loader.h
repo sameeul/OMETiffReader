@@ -4,6 +4,8 @@
 #include <vector>
 #include <fast_loader/specialised_tile_loader/grayscale_tiff_strip_loader.h>
 #include <fast_loader/specialised_tile_loader/grayscale_tiff_tile_loader.h>
+#include <omp.h>
+
 class OmeTiffLoader{
 
     private:
@@ -26,6 +28,9 @@ class OmeTiffLoader{
         std::shared_ptr<std::vector<uint32_t>> getTileSectionData(size_t xRefCoord, size_t yRefCoord, int option);
         std::shared_ptr<std::vector<uint32_t>> getBoundingBoxVirtualTileData(size_t const indexRowPixelMin, size_t const indexRowPixelMax,
                                                                     size_t const indexColPixelMin, size_t const indexColPixelMax);
+        std::shared_ptr<std::vector<uint32_t>> getBoundingBoxVirtualTileDataStrideVersion(size_t const indexRowPixelMin, size_t const indexRowPixelMax,
+                                                                    size_t rowStride, size_t const indexColPixelMin, size_t const indexColPixelMax, 
+                                                                    size_t colStride);
         size_t getRowTileCount () const;
         size_t getColumnTileCount () const;
         size_t getImageHeight() const ;

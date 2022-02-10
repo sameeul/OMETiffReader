@@ -59,5 +59,12 @@ PYBIND11_MODULE(image_loader_lib, m) {
             size_t num_rows = indexRowMaxPixel - indexRowMinPixel + 1;
             size_t num_cols = indexColMaxPixel - indexColMinPixel + 1;
             return as_pyarray_shared_2d(tmp, num_rows, num_cols) ;
+        }, py::return_value_policy::reference)
+        .def("get_virtual_tile_data_bounding_box_2d_strided",
+        [](OmeTiffLoader& tl, size_t const indexRowMinPixel, size_t const indexRowMaxPixel, size_t const rowStride,  size_t const indexColMinPixel, size_t const indexColMaxPixel, size_t const colStride) -> py::array_t<uint32_t> {
+            auto tmp = tl.getBoundingBoxVirtualTileDataStrideVersion(indexRowMinPixel, indexRowMaxPixel, rowStride, indexColMinPixel, indexColMaxPixel, colStride);
+            size_t num_rows = (indexRowMaxPixel - indexRowMinPixel)/rowStride + 1;
+            size_t num_cols = (indexColMaxPixel - indexColMinPixel)/colStride + 1;
+            return as_pyarray_shared_2d(tmp, num_rows, num_cols) ;
         }, py::return_value_policy::reference);
 }

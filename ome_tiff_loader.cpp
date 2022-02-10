@@ -2,6 +2,11 @@
 #include "ome_tiff_loader.h"
 #include <numeric>
 
+size_t adjustStride (size_t startPos, size_t currentPos, size_t strideVal){
+	size_t tmp = (currentPos-startPos)%strideVal;
+	return currentPos+tmp;
+}
+
 OmeTiffLoader::OmeTiffLoader(const std::string &fNameWithPath){
     if (checkTileStatus(fNameWithPath))
 		{
@@ -122,8 +127,12 @@ std::shared_ptr<std::vector<uint32_t>> OmeTiffLoader::getBoundingBoxVirtualTileD
 	// cols are Y coordinate (increasing from left to right)
 	// we need to transform from Local Tile Coordinate to Global Pixel Coordiate to Virtual Tile Coordinate
 
+	auto ih = gsTiffTileLoader->fullHeight(0);
+	auto iw = gsTiffTileLoader->fullWidth(0);
+	auto indexTrueRowPixelMax = indexRowPixelMax > ih ? ih : indexRowPixelMax;
+	auto indexTrueColPixelMax = indexColPixelMax > iw ? iw : indexColPixelMax;
 	auto topLeftTile = getTileContainingPixel(indexRowPixelMin, indexColPixelMin);
-	auto bottomRightTile = getTileContainingPixel(indexRowPixelMax, indexColPixelMax);
+	auto bottomRightTile = getTileContainingPixel(indexTrueRowPixelMax, indexTrueColPixelMax);
 	auto minRowIndex = topLeftTile.first;
 	auto minColIndex = topLeftTile.second;
 	auto maxRowIndex = bottomRightTile.first;
@@ -135,8 +144,8 @@ std::shared_ptr<std::vector<uint32_t>> OmeTiffLoader::getBoundingBoxVirtualTileD
 	auto th = gsTiffTileLoader->tileHeight(0);
 	std::shared_ptr<std::vector<uint32_t>> tileData = std::make_shared<std::vector<uint32_t>>(tw * th);
 
-	auto vtw = indexColPixelMax-indexColPixelMin+1;
-	auto vth = indexRowPixelMax-indexRowPixelMin+1;
+	auto vtw = indexTrueColPixelMax-indexColPixelMin+1;
+	auto vth = indexTrueRowPixelMax-indexRowPixelMin+1;
 	std::shared_ptr<std::vector<uint32_t>> virtualTileData = std::make_shared<std::vector<uint32_t>>(vtw * vth);
 
 	for (int i = minRowIndex; i <= maxRowIndex; ++i)
@@ -145,17 +154,83 @@ std::shared_ptr<std::vector<uint32_t>> OmeTiffLoader::getBoundingBoxVirtualTileD
 		{
 			gsTiffTileLoader->loadTileFromFile(tileData, i, j, 0, 0);	
 			// take row slice from local tile and place it in virtual tile
-				size_t initialLocalX = indexRowPixelMin > i*th ? indexRowPixelMin-i*th : 0;	
-				size_t endLocalX = indexRowPixelMax < (i+1)*th ? indexRowPixelMax-i*th: th;
-				for (size_t localX=initialLocalX; localX<=endLocalX; ++localX){
-					size_t globalX = i*th + localX;
-					size_t virtualX = globalX - indexRowPixelMin;
-					size_t initialLocalY = indexColPixelMin > j*tw ? indexColPixelMin-j*tw : 0;
-					size_t endLocalY = indexColPixelMax < (j+1)*tw ? indexColPixelMax-j*tw : tw;
-					size_t initialGLobalY = j*tw + initialLocalY;
-					size_t initialVirtualY = initialGLobalY - indexColPixelMin;
-					std::copy(tileData->begin()+localX*tw+initialLocalY, tileData->begin()+localX*tw+endLocalY+1,virtualTileData->begin()+virtualX*vtw+initialVirtualY);					
-				}	
+			// globalX = i*th + localX;
+			// virtualX = globalX - indexRowPixelMin;
+			// initialGLobalY = j*tw + initialLocalY;
+			// initialVirtualY = initialGLobalY - indexColPixelMin;
+			size_t initialLocalX = indexRowPixelMin > i*th ? indexRowPixelMin-i*th : 0;	
+			size_t endLocalX = indexTrueRowPixelMax < (i+1)*th ? indexTrueRowPixelMax-i*th: th;
+			size_t initialLocalY = indexColPixelMin > j*tw ? indexColPixelMin-j*tw : 0;
+			size_t endLocalY = indexTrueColPixelMax < (j+1)*tw ? indexTrueColPixelMax-j*tw : tw;
+			size_t initialVirtualY = j*tw + initialLocalY - indexColPixelMin;
+#pragma omp parallel
+#pragma omp for
+			for (size_t localX=initialLocalX; localX<=endLocalX; ++localX){
+				size_t virtualX = i*th + localX - indexRowPixelMin;
+				std::copy(tileData->begin()+localX*tw+initialLocalY, tileData->begin()+localX*tw+endLocalY+1,virtualTileData->begin()+virtualX*vtw+initialVirtualY);					
+			}	
+		}
+	}
+	return virtualTileData;
+}
+
+std::shared_ptr<std::vector<uint32_t>> OmeTiffLoader::getBoundingBoxVirtualTileDataStrideVersion(size_t const indexRowPixelMin, size_t const indexRowPixelMax,
+                                                                    size_t rowStride, size_t const indexColPixelMin, size_t const indexColPixelMax, 
+                                                                    size_t colStride)
+{
+
+	// Convention 
+	// rows are X coordinate (increasing from top to bottom)
+	// cols are Y coordinate (increasing from left to right)
+	// we need to transform from Local Tile Coordinate to Global Pixel Coordiate to Virtual Tile Coordinate
+
+	auto ih = gsTiffTileLoader->fullHeight(0);
+	auto iw = gsTiffTileLoader->fullWidth(0);
+	auto indexTrueRowPixelMax = indexRowPixelMax > ih ? ih : indexRowPixelMax;
+	auto indexTrueColPixelMax = indexColPixelMax > iw ? iw : indexColPixelMax;
+	auto topLeftTile = getTileContainingPixel(indexRowPixelMin, indexColPixelMin);
+	auto bottomRightTile = getTileContainingPixel(indexTrueRowPixelMax, indexTrueColPixelMax);
+	auto minRowIndex = topLeftTile.first;
+	auto minColIndex = topLeftTile.second;
+	auto maxRowIndex = bottomRightTile.first;
+	auto maxColIndex = bottomRightTile.second;
+
+	// now loop through each tile, get tile data, fill the virtual tile vector
+
+	auto tw = gsTiffTileLoader->tileWidth(0);
+	auto th = gsTiffTileLoader->tileHeight(0);
+	std::shared_ptr<std::vector<uint32_t>> tileData = std::make_shared<std::vector<uint32_t>>(tw * th);
+
+	auto vtw = (indexTrueColPixelMax-indexColPixelMin)/colStride+1;
+	auto vth = (indexTrueRowPixelMax-indexRowPixelMin)/rowStride+1;
+	std::shared_ptr<std::vector<uint32_t>> virtualTileData = std::make_shared<std::vector<uint32_t>>(vtw * vth);
+
+	for (int i = minRowIndex; i <= maxRowIndex; ++i)
+	{
+		for (int j = minColIndex; j <= maxColIndex; ++j)
+		{
+			gsTiffTileLoader->loadTileFromFile(tileData, i, j, 0, 0);	
+			// take row slice from local tile and place it in virtual tile
+			// globalX = i*th + localX;
+			// virtualX = globalX - indexRowPixelMin;
+			// initialGLobalY = j*tw + initialLocalY;
+			// initialVirtualY = initialGLobalY - indexColPixelMin;
+			size_t initialLocalX = indexRowPixelMin > i*th ? indexRowPixelMin-i*th : 0;	
+			// adjust for row stride
+			size_t initialGlobalX = i*th + initialLocalX;
+			initialGlobalX = adjustStride(indexRowPixelMin, initialGlobalX, rowStride);
+			initialLocalX = initialGlobalX - i*th;
+
+			size_t endLocalX = indexTrueRowPixelMax < (i+1)*th ? indexTrueRowPixelMax-i*th: th;
+			size_t initialLocalY = indexColPixelMin > j*tw ? indexColPixelMin-j*tw : 0;
+			size_t endLocalY = indexTrueColPixelMax < (j+1)*tw ? indexTrueColPixelMax-j*tw : tw;
+			size_t initialVirtualY = j*tw + initialLocalY - indexColPixelMin;
+#pragma omp parallel
+#pragma omp for
+			for (size_t localX=initialLocalX; localX<=endLocalX; localX=localX+rowStride){
+				size_t virtualX = (i*th + localX - indexRowPixelMin)/rowStride;
+				std::copy(tileData->begin()+localX*tw+initialLocalY, tileData->begin()+localX*tw+endLocalY+1,virtualTileData->begin()+virtualX*vtw+initialVirtualY);					
+			}	
 		}
 	}
 	return virtualTileData;
