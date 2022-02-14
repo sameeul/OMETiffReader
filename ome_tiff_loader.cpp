@@ -1,10 +1,16 @@
-
 #include "ome_tiff_loader.h"
-#include <numeric>
 
 size_t adjustStride (size_t startPos, size_t currentPos, size_t strideVal){
-	size_t tmp = (currentPos-startPos)%strideVal;
-	return currentPos+tmp;
+	if (strideVal == 0) return currentPos; // guard against div by 0
+
+	size_t tmp = currentPos-startPos;
+	if (tmp%strideVal == 0) 
+	{
+		return currentPos; // no adjustment needed
+	} else 
+	{
+		return ((tmp/strideVal)+1)*strideVal; // move to the next eligible position
+	}
 }
 
 OmeTiffLoader::OmeTiffLoader(const std::string &fNameWithPath){
@@ -159,9 +165,9 @@ std::shared_ptr<std::vector<uint32_t>> OmeTiffLoader::getBoundingBoxVirtualTileD
 			// initialGLobalY = j*tw + initialLocalY;
 			// initialVirtualY = initialGLobalY - indexColPixelMin;
 			size_t initialLocalX = indexRowPixelMin > i*th ? indexRowPixelMin-i*th : 0;	
-			size_t endLocalX = indexTrueRowPixelMax < (i+1)*th ? indexTrueRowPixelMax-i*th: th;
+			size_t endLocalX = indexTrueRowPixelMax < (i+1)*th ? indexTrueRowPixelMax-i*th: th-1;
 			size_t initialLocalY = indexColPixelMin > j*tw ? indexColPixelMin-j*tw : 0;
-			size_t endLocalY = indexTrueColPixelMax < (j+1)*tw ? indexTrueColPixelMax-j*tw : tw;
+			size_t endLocalY = indexTrueColPixelMax < (j+1)*tw ? indexTrueColPixelMax-j*tw : tw-1;
 			size_t initialVirtualY = j*tw + initialLocalY - indexColPixelMin;
 #pragma omp parallel
 #pragma omp for
@@ -220,16 +226,36 @@ std::shared_ptr<std::vector<uint32_t>> OmeTiffLoader::getBoundingBoxVirtualTileD
 			size_t initialGlobalX = i*th + initialLocalX;
 			initialGlobalX = adjustStride(indexRowPixelMin, initialGlobalX, rowStride);
 			initialLocalX = initialGlobalX - i*th;
+			size_t endLocalX = indexTrueRowPixelMax < (i+1)*th ? indexTrueRowPixelMax-i*th: th-1;
 
-			size_t endLocalX = indexTrueRowPixelMax < (i+1)*th ? indexTrueRowPixelMax-i*th: th;
 			size_t initialLocalY = indexColPixelMin > j*tw ? indexColPixelMin-j*tw : 0;
-			size_t endLocalY = indexTrueColPixelMax < (j+1)*tw ? indexTrueColPixelMax-j*tw : tw;
+			// adjust for col stride
+			size_t initialGlobalY = j*tw + initialLocalY;
+			initialGlobalY = adjustStride(indexColPixelMin, initialGlobalY, colStride);
+			initialLocalY = initialGlobalY - j*tw;			
+			size_t endLocalY = indexTrueColPixelMax < (j+1)*tw ? indexTrueColPixelMax-j*tw : tw-1;
 			size_t initialVirtualY = j*tw + initialLocalY - indexColPixelMin;
 #pragma omp parallel
 #pragma omp for
-			for (size_t localX=initialLocalX; localX<=endLocalX; localX=localX+rowStride){
+
+			for (size_t localX=initialLocalX; localX<=endLocalX; localX=localX+rowStride)
+			{
 				size_t virtualX = (i*th + localX - indexRowPixelMin)/rowStride;
-				std::copy(tileData->begin()+localX*tw+initialLocalY, tileData->begin()+localX*tw+endLocalY+1,virtualTileData->begin()+virtualX*vtw+initialVirtualY);					
+				if (colStride == 1) 
+				{
+
+					std::copy(tileData->begin()+localX*tw+initialLocalY, tileData->begin()+localX*tw+endLocalY+1,virtualTileData->begin()+virtualX*vtw+initialVirtualY);
+				}
+				else 
+				{
+					for (size_t localY=initialLocalY; localY<=endLocalY; localY=localY+colStride)
+					{
+						size_t virtualY = (j*tw + localY - indexColPixelMin)/colStride;
+						size_t localDataIndex = localX*tw+localY;
+						size_t virtualDataIndex = virtualX*vtw+virtualY;
+						virtualTileData->at(virtualDataIndex) = tileData->at(localDataIndex);						
+					}
+				}
 			}	
 		}
 	}

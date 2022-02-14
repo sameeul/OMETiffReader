@@ -5,6 +5,8 @@
 #include "ome_tiff_loader.h"
 #include <sys/resource.h>
 
+#include <numeric>
+
 size_t partial_sum(std::shared_ptr<std::vector<uint32_t>> data, size_t x_min, size_t x_max, size_t y_min, size_t y_max)
 {
     size_t sum = 0;
@@ -115,8 +117,8 @@ void test3()
 
 void test4()
 {
-    std::cout<<"Test 3 - Single Tile Memory usage" <<std::endl;
-    OmeTiffLoader imgLoader = OmeTiffLoader("r01_x10_y05_z08.ome.tif");
+    std::cout<<"Test 4 - Single Tile Memory usage" <<std::endl;
+    OmeTiffLoader imgLoader = OmeTiffLoader("/mnt/hdd8/axle/dev/imgloader/build/r01_x10_y05_z08.ome.tif");
     struct rusage rss1, rss2;
     auto start = std::chrono::steady_clock::now(); 
     auto tmp = getrusage(RUSAGE_SELF, &rss1);
@@ -130,10 +132,27 @@ void test4()
 
 }
 
+void test5()
+{
+    std::cout<<"Test 5 - Virtual Tile Stride" <<std::endl;
+    OmeTiffLoader imgLoader = OmeTiffLoader("/mnt/hdd8/axle/dev/imgloader/build/r01_x10_y05_z08.ome.tif");
+
+    std::shared_ptr<std::vector<uint32_t>> tileData1 = imgLoader.getBoundingBoxVirtualTileData(0,1079,0,1023);
+    std::shared_ptr<std::vector<uint32_t>> tileData = imgLoader.getBoundingBoxVirtualTileDataStrideVersion(0,1079,3,0,1023,1);
+    for(int i=0;i<10;i++){
+        if (i%2==0){
+            if(tileData1->at(i) != tileData->at(i/2)){std::cout<<"not match"<<std::endl;}
+        }
+    }
+    size_t sum1 = std::accumulate(tileData->begin(), tileData->end(), 0);
+    size_t sum2 = std::accumulate(tileData1->begin(), tileData1->end(), 0);
+    std::cout << sum1 << " " << sum2<<std::endl;
+}
 int main(){
-    test1();
-    test2();
-    test3();
-    test4();
+    //  test1();
+    //  test2();
+    //  test3();
+    //  test4();
+    test5();
     return 0;
 }

@@ -41,7 +41,12 @@ PYBIND11_MODULE(image_loader_lib, m) {
     .def("get_tile_data",
         [](OmeTiffLoader& tl, size_t const indexRowGlobalTile, size_t const indexColGlobalTile) -> py::array_t<uint32_t> {
             auto tmp = tl.getTileData(indexRowGlobalTile, indexColGlobalTile);
-            return as_pyarray_shared(tmp) ;
+            return as_pyarray_shared(tmp);
+        }, py::return_value_policy::reference)
+    .def("get_tile_data_2d",
+        [](OmeTiffLoader& tl, size_t const indexRowGlobalTile, size_t const indexColGlobalTile) -> py::array_t<uint32_t> {
+            auto tmp = tl.getTileData(indexRowGlobalTile, indexColGlobalTile);
+            return as_pyarray_shared_2d(tmp, tl.getTileHeight(), tl.getTileWidth()) ;;
         }, py::return_value_policy::reference)
      .def("get_tile_data_containing_pixel",
         [](OmeTiffLoader& tl, size_t const indexRowPixel, size_t const indexColPixel) -> py::array_t<uint32_t> {
@@ -56,15 +61,23 @@ PYBIND11_MODULE(image_loader_lib, m) {
         .def("get_virtual_tile_data_bounding_box_2d",
         [](OmeTiffLoader& tl, size_t const indexRowMinPixel, size_t const indexRowMaxPixel, size_t const indexColMinPixel, size_t const indexColMaxPixel) -> py::array_t<uint32_t> {
             auto tmp = tl.getBoundingBoxVirtualTileData(indexRowMinPixel, indexRowMaxPixel, indexColMinPixel, indexColMaxPixel);
-            size_t num_rows = indexRowMaxPixel - indexRowMinPixel + 1;
-            size_t num_cols = indexColMaxPixel - indexColMinPixel + 1;
+            auto ih = tl.getImageHeight();
+	        auto iw = tl.getImageWidth();
+	        auto indexTrueRowPixelMax = indexRowMaxPixel > ih ? ih : indexRowMaxPixel;
+	        auto indexTrueColPixelMax = indexColMaxPixel > iw ? iw : indexColMaxPixel;
+            size_t num_rows = indexTrueRowPixelMax - indexRowMinPixel + 1;
+            size_t num_cols = indexTrueColPixelMax - indexColMinPixel + 1;
             return as_pyarray_shared_2d(tmp, num_rows, num_cols) ;
         }, py::return_value_policy::reference)
         .def("get_virtual_tile_data_bounding_box_2d_strided",
         [](OmeTiffLoader& tl, size_t const indexRowMinPixel, size_t const indexRowMaxPixel, size_t const rowStride,  size_t const indexColMinPixel, size_t const indexColMaxPixel, size_t const colStride) -> py::array_t<uint32_t> {
             auto tmp = tl.getBoundingBoxVirtualTileDataStrideVersion(indexRowMinPixel, indexRowMaxPixel, rowStride, indexColMinPixel, indexColMaxPixel, colStride);
-            size_t num_rows = (indexRowMaxPixel - indexRowMinPixel)/rowStride + 1;
-            size_t num_cols = (indexColMaxPixel - indexColMinPixel)/colStride + 1;
+            auto ih = tl.getImageHeight();
+	        auto iw = tl.getImageWidth();
+	        auto indexTrueRowPixelMax = indexRowMaxPixel > ih ? ih : indexRowMaxPixel;
+	        auto indexTrueColPixelMax = indexColMaxPixel > iw ? iw : indexColMaxPixel;
+            size_t num_rows = (indexTrueRowPixelMax - indexRowMinPixel)/rowStride+1;
+            size_t num_cols = (indexTrueColPixelMax - indexColMinPixel)/colStride+1;
             return as_pyarray_shared_2d(tmp, num_rows, num_cols) ;
         }, py::return_value_policy::reference);
 }
